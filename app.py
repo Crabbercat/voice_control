@@ -23,6 +23,8 @@ if not MODEL_DIR.is_dir():
 
 app = Flask(__name__)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"[INFO] Using device: {device}")
+print(f"[INFO] Model: {MODEL_DIR}")
 
 processor = Wav2Vec2Processor.from_pretrained(
     MODEL_DIR,
@@ -109,3 +111,4 @@ def recognize():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=False)
+
