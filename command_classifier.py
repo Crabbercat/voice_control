@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 
 
 LIGHT_ON_PHRASES = (
@@ -45,15 +46,22 @@ COMMAND_PHRASES = (
 
 
 def normalize_text(text: str) -> str:
-    """Lowercase text and collapse repeated whitespace."""
-    return re.sub(r"\s+", " ", text.lower()).strip()
+    """Normalize Vietnamese text and common ASR character confusions."""
+    text = text.lower().replace("đ", "d")
+    text = "".join(
+        character
+        for character in unicodedata.normalize("NFD", text)
+        if unicodedata.category(character) != "Mn"
+    )
+    text = re.sub(r"\s+", " ", text).strip()
+    return text.replace("c", "t")
 
 
 def classify_command(text: str) -> str:
     """Return the matching IoT command, or UNKNOWN when no phrase matches."""
     normalized_text = normalize_text(text)
     for command, phrases in COMMAND_PHRASES:
-        if any(phrase in normalized_text for phrase in phrases):
+        if any(normalize_text(phrase) in normalized_text for phrase in phrases):
             return command
     return "UNKNOWN"
 
