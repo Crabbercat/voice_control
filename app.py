@@ -25,6 +25,11 @@ MODEL_DIR = (
     / "wav2vec2-vietnamese-160h"
 )
 
+CERT_DIR = BASE_DIR / "certs"
+
+CERT_FILE = CERT_DIR / "server.crt"
+KEY_FILE = CERT_DIR / "server.key"
+
 SAMPLE_RATE = 16_000
 
 HOST = "0.0.0.0"
@@ -32,13 +37,23 @@ PORT = 5000
 
 
 # ============================================================
-# CHECK MODEL
+# CHECK FILES
 # ============================================================
 
 if not MODEL_DIR.is_dir():
     raise FileNotFoundError(
         f"Local model not found: {MODEL_DIR}\n"
         "Please run download_model.py first."
+    )
+
+if not CERT_FILE.is_file():
+    raise FileNotFoundError(
+        f"SSL certificate not found: {CERT_FILE}"
+    )
+
+if not KEY_FILE.is_file():
+    raise FileNotFoundError(
+        f"SSL private key not found: {KEY_FILE}"
     )
 
 
@@ -50,28 +65,43 @@ app = Flask(__name__)
 
 
 # ============================================================
-# LOAD DEVICE
+# DEVICE
 # ============================================================
 
 device = torch.device(
-    "cuda" if torch.cuda.is_available() else "cpu"
+    "cuda"
+    if torch.cuda.is_available()
+    else "cpu"
 )
 
+
+# ============================================================
+# STARTUP LOG
+# ============================================================
+
 print("=" * 60)
-print("[INFO] Voice Control Server")
+print("[INFO] Voice Control HTTPS Server")
 print("=" * 60)
+
 print(f"[INFO] Base directory : {BASE_DIR}")
 print(f"[INFO] Model directory: {MODEL_DIR}")
 print(f"[INFO] Device         : {device}")
 print(f"[INFO] Sample rate    : {SAMPLE_RATE} Hz")
+
+print(f"[INFO] Certificate    : {CERT_FILE}")
+print(f"[INFO] Private key    : {KEY_FILE}")
+
+print(f"[INFO] HTTPS host     : {HOST}")
+print(f"[INFO] HTTPS port     : {PORT}")
+
 print("=" * 60)
 
 
 # ============================================================
-# LOAD WAV2VEC2 PROCESSOR
+# LOAD PROCESSOR
 # ============================================================
 
-print("[INFO] Loading processor...")
+print("[INFO] Loading Wav2Vec2 processor...")
 
 processor = Wav2Vec2Processor.from_pretrained(
     MODEL_DIR,
@@ -82,7 +112,7 @@ print("[INFO] Processor loaded.")
 
 
 # ============================================================
-# LOAD WAV2VEC2 MODEL
+# LOAD MODEL
 # ============================================================
 
 print("[INFO] Loading Wav2Vec2 model...")
@@ -100,21 +130,20 @@ print("=" * 60)
 
 
 # ============================================================
-# AUDIO PROCESSING
+# AUDIO LOADER
 # ============================================================
 
 def load_browser_audio(audio_path: Path) -> np.ndarray:
     """
-    Load audio recorded by browser.
+    Decode browser-recorded audio.
 
-    Browser usually sends:
+    Input:
         WebM / OGG / OPUS
 
-    Audio is converted to:
-        - mono
-        - 16 kHz
-        - float32
-        - range approximately [-1, 1]
+    Output:
+        mono
+        16 kHz
+        float32
     """
 
     chunks = []
@@ -125,15 +154,21 @@ def load_browser_audio(audio_path: Path) -> np.ndarray:
         rate=SAMPLE_RATE,
     )
 
-    print(f"[INFO] Decoding audio: {audio_path.name}")
+    print(
+        f"[INFO] Decoding audio: "
+        f"{audio_path.name}"
+    )
 
     with av.open(str(audio_path)) as container:
 
         for frame in container.decode(audio=0):
 
-            resampled_frames = resampler.resample(frame)
+            resampled_frames = (
+                resampler.resample(frame)
+            )
 
             for resampled_frame in resampled_frames:
+
                 audio_array = (
                     resampled_frame
                     .to_ndarray()
@@ -142,10 +177,13 @@ def load_browser_audio(audio_path: Path) -> np.ndarray:
 
                 chunks.append(audio_array)
 
-        # Flush remaining samples from resampler
-        remaining_frames = resampler.resample(None)
+        # Flush resampler
+        remaining_frames = (
+            resampler.resample(None)
+        )
 
         for resampled_frame in remaining_frames:
+
             audio_array = (
                 resampled_frame
                 .to_ndarray()
@@ -162,38 +200,56 @@ def load_browser_audio(audio_path: Path) -> np.ndarray:
     audio = np.concatenate(chunks)
 
     # int16 -> float32
-    audio = audio.astype(np.float32) / 32768.0
+    audio = (
+        audio.astype(np.float32)
+        / 32768.0
+    )
+
+    duration = (
+        len(audio)
+        / SAMPLE_RATE
+    )
 
     print(
         f"[INFO] Audio loaded: "
         f"{len(audio)} samples "
-        f"({len(audio) / SAMPLE_RATE:.2f}s)"
+        f"({duration:.2f}s)"
     )
 
     return audio
 
 
+# ============================================================
+# SPEECH TO TEXT
+# ============================================================
+
 def transcribe_audio(audio_path: Path) -> str:
     """
-    Convert an audio file into Vietnamese text
-    using the local Wav2Vec2 model.
+    Convert audio into Vietnamese text.
     """
 
     suffix = audio_path.suffix.lower()
 
-    print(f"[INFO] Transcribing: {audio_path.name}")
-    print(f"[INFO] Audio format: {suffix}")
+    print("=" * 60)
+    print("[INFO] Starting transcription")
+    print(f"[INFO] File format: {suffix}")
 
     # --------------------------------------------------------
     # Browser audio
     # --------------------------------------------------------
 
-    if suffix in {".webm", ".ogg", ".opus"}:
+    if suffix in {
+        ".webm",
+        ".ogg",
+        ".opus",
+    }:
 
-        audio = load_browser_audio(audio_path)
+        audio = load_browser_audio(
+            audio_path
+        )
 
     # --------------------------------------------------------
-    # Normal audio files
+    # Normal audio
     # --------------------------------------------------------
 
     else:
@@ -206,12 +262,11 @@ def transcribe_audio(audio_path: Path) -> str:
 
         print(
             f"[INFO] Audio loaded with librosa: "
-            f"{len(audio)} samples "
-            f"({len(audio) / SAMPLE_RATE:.2f}s)"
+            f"{len(audio)} samples"
         )
 
     # --------------------------------------------------------
-    # Prepare input for Wav2Vec2
+    # Processor
     # --------------------------------------------------------
 
     inputs = processor(
@@ -220,13 +275,15 @@ def transcribe_audio(audio_path: Path) -> str:
         return_tensors="pt",
     )
 
-    input_values = inputs.input_values.to(device)
+    input_values = (
+        inputs.input_values.to(device)
+    )
 
     # --------------------------------------------------------
-    # Inference
+    # Model inference
     # --------------------------------------------------------
 
-    print("[INFO] Running Wav2Vec2 inference...")
+    print("[INFO] Running Wav2Vec2...")
 
     with torch.inference_mode():
 
@@ -247,54 +304,67 @@ def transcribe_audio(audio_path: Path) -> str:
         predicted_ids
     )[0].strip()
 
-    print(f"[INFO] Recognized text: {text}")
+    print(
+        f"[INFO] Recognized text: "
+        f"{text}"
+    )
 
     return text
 
 
 # ============================================================
-# ROUTES
+# WEB PAGE
 # ============================================================
 
 @app.get("/")
 def index():
-    """
-    Render the voice-control web interface.
-    """
 
-    return render_template("index.html")
+    return render_template(
+        "index.html"
+    )
 
+
+# ============================================================
+# HEALTH CHECK
+# ============================================================
+
+@app.get("/health")
+def health():
+
+    return jsonify(
+        success=True,
+        status="running",
+        protocol="https",
+        device=str(device),
+        model=str(MODEL_DIR),
+    )
+
+
+# ============================================================
+# RECOGNIZE AUDIO
+# ============================================================
 
 @app.post("/recognize")
 def recognize():
-    """
-    Receive recorded audio from browser.
 
-    Request:
-        multipart/form-data
-        audio=<audio file>
-
-    Response:
-        {
-            "success": true,
-            "text": "...",
-            "command": "LIGHT_ON",
-            "hardware": {...}
-        }
-    """
-
-    print("\n" + "=" * 60)
+    print("\n")
+    print("=" * 60)
     print("[REQUEST] POST /recognize")
     print("=" * 60)
 
     # --------------------------------------------------------
-    # Get uploaded audio
+    # Get audio
     # --------------------------------------------------------
 
-    audio_file = request.files.get("audio")
+    audio_file = request.files.get(
+        "audio"
+    )
 
     if audio_file is None:
-        print("[ERROR] No audio field in request.")
+
+        print(
+            "[ERROR] No audio file provided."
+        )
 
         return jsonify(
             success=False,
@@ -302,17 +372,23 @@ def recognize():
         ), 400
 
     if not audio_file.filename:
-        print("[ERROR] Audio filename is empty.")
+
+        print(
+            "[ERROR] Audio filename is empty."
+        )
 
         return jsonify(
             success=False,
             error="Audio filename is empty.",
         ), 400
 
-    print(f"[INFO] Uploaded file: {audio_file.filename}")
+    print(
+        f"[INFO] Uploaded file: "
+        f"{audio_file.filename}"
+    )
 
     # --------------------------------------------------------
-    # Determine file extension
+    # File extension
     # --------------------------------------------------------
 
     suffix = Path(
@@ -322,14 +398,16 @@ def recognize():
     if not suffix:
         suffix = ".webm"
 
-    print(f"[INFO] File suffix: {suffix}")
+    print(
+        f"[INFO] Audio suffix: {suffix}"
+    )
 
     temporary_path = None
 
     try:
 
         # ----------------------------------------------------
-        # Save temporary audio file
+        # Save temporary file
         # ----------------------------------------------------
 
         with tempfile.NamedTemporaryFile(
@@ -351,7 +429,7 @@ def recognize():
         )
 
         # ----------------------------------------------------
-        # Speech-to-text
+        # Speech recognition
         # ----------------------------------------------------
 
         text = transcribe_audio(
@@ -359,7 +437,7 @@ def recognize():
         )
 
         # ----------------------------------------------------
-        # Command classification
+        # Classify command
         # ----------------------------------------------------
 
         command = classify_command(
@@ -367,12 +445,11 @@ def recognize():
         )
 
         print(
-            f"[INFO] Classified command: "
-            f"{command}"
+            f"[INFO] Command: {command}"
         )
 
         # ----------------------------------------------------
-        # Hardware control
+        # Hardware
         # ----------------------------------------------------
 
         hardware_result = (
@@ -382,7 +459,7 @@ def recognize():
         )
 
         print(
-            f"[INFO] Hardware result: "
+            f"[INFO] Hardware: "
             f"{hardware_result}"
         )
 
@@ -390,31 +467,22 @@ def recognize():
         # Response
         # ----------------------------------------------------
 
-        response = {
-            "success": True,
-            "text": text,
-            "command": command,
-            "hardware": hardware_result,
-        }
-
-        print(
-            f"[INFO] Response: {response}"
+        return jsonify(
+            success=True,
+            text=text,
+            command=command,
+            hardware=hardware_result,
         )
 
-        return jsonify(response), 200
-
     except Exception as error:
-
-        # ----------------------------------------------------
-        # Error logging
-        # ----------------------------------------------------
 
         app.logger.exception(
             "Audio recognition failed"
         )
 
         print(
-            f"[ERROR] {type(error).__name__}: "
+            f"[ERROR] "
+            f"{type(error).__name__}: "
             f"{error}"
         )
 
@@ -426,7 +494,7 @@ def recognize():
     finally:
 
         # ----------------------------------------------------
-        # Remove temporary file
+        # Cleanup
         # ----------------------------------------------------
 
         if temporary_path is not None:
@@ -438,47 +506,43 @@ def recognize():
                 )
 
                 print(
-                    f"[INFO] Removed temporary file: "
-                    f"{temporary_path}"
+                    "[INFO] Temporary file "
+                    "removed."
                 )
 
             except Exception as cleanup_error:
 
                 print(
-                    "[WARNING] Could not remove "
-                    f"temporary file: {cleanup_error}"
+                    "[WARNING] Failed to remove "
+                    f"temporary file: "
+                    f"{cleanup_error}"
                 )
 
 
 # ============================================================
-# HEALTH CHECK
-# ============================================================
-
-@app.get("/health")
-def health():
-    """
-    Simple server health check.
-    """
-
-    return jsonify(
-        success=True,
-        status="running",
-        device=str(device),
-        model=str(MODEL_DIR),
-    ), 200
-
-
-# ============================================================
-# APPLICATION ENTRY POINT
+# MAIN
 # ============================================================
 
 if __name__ == "__main__":
 
     print()
     print("=" * 60)
-    print("[INFO] Starting Flask server...")
-    print(f"[INFO] Host: {HOST}")
-    print(f"[INFO] Port: {PORT}")
+    print("[INFO] Starting HTTPS Flask server")
+    print("=" * 60)
+
+    print(
+        f"[INFO] HTTPS URL:"
+        f" https://0.0.0.0:{PORT}"
+    )
+
+    print(
+        "[INFO] Access from another computer using:"
+    )
+
+    print(
+        f"       https://<RASPBERRY_PI_IP>:{PORT}"
+    )
+
     print("=" * 60)
     print()
 
@@ -486,4 +550,8 @@ if __name__ == "__main__":
         host=HOST,
         port=PORT,
         debug=False,
+        ssl_context=(
+            str(CERT_FILE),
+            str(KEY_FILE),
+        ),
     )
