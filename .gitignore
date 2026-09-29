@@ -1,0 +1,35 @@
+# Python cache and build artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+.dist/
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local model files
+models/
+
+# Local recordings and generated audio
+voice/*.wav
+voice/*.mp3
+voice/*.flac
+voice/*.ogg
+voice/*.webm
+voice/*.opus
+
+# Environment and local configuration
+.env
+.env.*
+!.env.example
+
+# Editor and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

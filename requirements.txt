@@ -1,0 +1,6 @@
+Flask
+av
+librosa
+soundfile
+torch
+transformers
