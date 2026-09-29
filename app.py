@@ -555,3 +555,8 @@ if __name__ == "__main__":
             str(KEY_FILE),
         ),
     )
+
+
+@app.get("/status")
+def status():
+    return jsonify(success=True, hardware=hardware_controller.status())

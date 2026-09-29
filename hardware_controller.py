@@ -55,6 +55,14 @@ class HardwareController:
     def mode(self) -> str:
         return "simulation" if self._simulated else "gpio"
 
+    def status(self) -> dict[str, str]:
+        with self._lock:
+            return {
+                "mode": self.mode,
+                "light": "ON" if self._states["light"] else "OFF",
+                "fan": "ON" if self._states["fan"] else "OFF",
+            }
+
     def execute(self, command: str) -> dict[str, object]:
         actions = {
             "LIGHT_ON": self.light_on,

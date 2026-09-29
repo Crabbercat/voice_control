@@ -24,7 +24,7 @@
             place-items: center;
             padding: 24px;
             color: var(--ink);
-            font-family: Georgia, "Times New Roman", serif;
+            font-family: "Segoe UI", Tahoma, Arial, sans-serif;
             background: radial-gradient(circle at 15% 15%, #fff9ec 0 16%, transparent 42%), var(--paper);
         }
         main {
@@ -41,8 +41,8 @@
             letter-spacing: 0.12em;
             text-transform: uppercase;
         }
-        h1 { margin: 0; font-size: clamp(2rem, 7vw, 3.3rem); line-height: 0.98; }
-        .intro { margin: 18px 0 32px; color: var(--muted); font: 1rem/1.5 Arial, sans-serif; }
+        h1 { margin: 0; font-size: clamp(2rem, 7vw, 3.3rem); line-height: 0.98; letter-spacing: -0.02em; }
+        .intro { margin: 18px 0 32px; color: var(--muted); font: 1rem/1.5 "Segoe UI", Tahoma, Arial, sans-serif; }
         button {
             width: 100%;
             min-height: 54px;
@@ -51,15 +51,22 @@
             color: #fff;
             background: var(--accent);
             cursor: pointer;
-            font: 700 1rem Arial, sans-serif;
+            font: 700 1rem "Segoe UI", Tahoma, Arial, sans-serif;
         }
         button:hover { background: var(--accent-dark); }
         button:disabled { cursor: wait; opacity: 0.6; }
-        .status { margin: 22px 0 30px; padding-top: 18px; border-top: 1px solid var(--line); font: 0.95rem Arial, sans-serif; }
-        .label { margin: 0 0 10px; color: var(--muted); font: 700 0.78rem Arial, sans-serif; text-transform: uppercase; letter-spacing: 0.08em; }
+        .status { margin: 22px 0 30px; padding-top: 18px; border-top: 1px solid var(--line); font: 0.95rem "Segoe UI", Tahoma, Arial, sans-serif; }
+        .label { margin: 0 0 10px; color: var(--muted); font: 700 0.78rem "Segoe UI", Tahoma, Arial, sans-serif; text-transform: uppercase; letter-spacing: 0.08em; }
         #transcript { min-height: 2.2em; margin: 0; font-size: clamp(1.5rem, 5vw, 2.2rem); line-height: 1.2; overflow-wrap: anywhere; }
         .action { margin-top: 28px; }
-        #command { margin: 0; color: var(--accent); font: 700 1.35rem Arial, sans-serif; letter-spacing: 0.04em; }
+        #command { margin: 0; color: var(--accent); font: 700 1.35rem "Segoe UI", Tahoma, Arial, sans-serif; letter-spacing: 0.04em; }
+        .devices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 30px; }
+        .device-card { padding: 16px; border: 1px solid var(--line); background: #faf7ef; }
+        .device-name { margin: 0 0 8px; font-weight: 700; }
+        .device-state { margin: 0; color: var(--muted); font-size: 0.92rem; }
+        .device-state strong { color: var(--ink); }
+        .device-state.is-on strong { color: #287a4a; }
+        .device-mode { grid-column: 1 / -1; margin: 0; color: var(--muted); font-size: 0.8rem; }
         .error { color: var(--accent-dark); }
     </style>
 </head>
@@ -76,12 +83,26 @@
             <p class="label">Action</p>
             <p id="command" aria-live="polite">&mdash;</p>
         </div>
+        <section class="devices" aria-label="Device status">
+            <article class="device-card">
+                <p class="device-name">Đèn</p>
+                <p class="device-state" id="lightState">Trạng thái: <strong>OFF</strong></p>
+            </article>
+            <article class="device-card">
+                <p class="device-name">Quạt</p>
+                <p class="device-state" id="fanState">Trạng thái: <strong>OFF</strong></p>
+            </article>
+            <p class="device-mode" id="deviceMode">Chế độ: đang tải...</p>
+        </section>
     </main>
     <script>
         const recordButton = document.querySelector("#recordButton");
         const status = document.querySelector("#status");
         const transcript = document.querySelector("#transcript");
         const command = document.querySelector("#command");
+        const lightState = document.querySelector("#lightState");
+        const fanState = document.querySelector("#fanState");
+        const deviceMode = document.querySelector("#deviceMode");
         let recorder;
         let stream;
         let chunks = [];
@@ -89,6 +110,29 @@
         function setStatus(message, isError = false) {
             status.textContent = `Status: ${message}`;
             status.classList.toggle("error", isError);
+        }
+
+        function updateDeviceState(deviceElement, state) {
+            deviceElement.innerHTML = `Trạng thái: <strong>${state}</strong>`;
+            deviceElement.classList.toggle("is-on", state === "ON");
+        }
+
+        function updateDevices(hardware) {
+            if (!hardware) return;
+            updateDeviceState(lightState, hardware.light || "OFF");
+            updateDeviceState(fanState, hardware.fan || "OFF");
+            deviceMode.textContent = `Chế độ: ${hardware.mode || "unknown"}`;
+        }
+
+        async function loadDeviceStatus() {
+            try {
+                const response = await fetch("/status");
+                const result = await response.json();
+                if (!response.ok || !result.success) throw new Error("Unable to load device status.");
+                updateDevices(result.hardware);
+            } catch (error) {
+                deviceMode.textContent = "Chế độ: không kết nối được";
+            }
         }
 
         function supportedMimeType() {
@@ -140,6 +184,7 @@
                 if (!response.ok || !result.success) throw new Error(result.error || "Recognition failed.");
                 transcript.textContent = result.text || "(No speech detected)";
                 command.textContent = result.command || "UNKNOWN";
+                updateDevices(result.hardware);
                 setStatus(`Recognized: ${result.text || "(No speech detected)"}`);
             } catch (error) {
                 setStatus(error.message, true);
@@ -152,6 +197,7 @@
             if (recorder && recorder.state === "recording") stopRecording();
             else startRecording();
         });
+        loadDeviceStatus();
     </script>
 </body>
 </html>
