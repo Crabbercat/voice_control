@@ -9,6 +9,7 @@ from flask import Flask, jsonify, render_template, request
 from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor
 
 from command_classifier import classify_command
+from hardware_controller import hardware_controller
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -95,7 +96,9 @@ def recognize():
             temporary_path = Path(temporary_file.name)
 
         text = transcribe_audio(temporary_path)
-        return jsonify(success=True, text=text, command=classify_command(text))
+        command = classify_command(text)
+        hardware = hardware_controller.execute(command)
+        return jsonify(success=True, text=text, command=command, hardware=hardware)
     except Exception as error:
         app.logger.exception("Audio recognition failed")
         return jsonify(success=False, error=str(error)), 500

@@ -1,6 +1,7 @@
-Flask
-av
-librosa
-soundfile
-torch
-transformers
+Flask==3.1.3
+av==18.1.0
+librosa==0.11.0
+soundfile==0.14.0
+transformers==5.17.0
+lgpio==0.2.2.0
+torch==2.14.0+cpu

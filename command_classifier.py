@@ -6,12 +6,16 @@ import re
 LIGHT_ON_PHRASES = (
     "bật cái đèn",
     "mở cái đèn",
+    "bật điện",
+    "mở điện",
     "cho đèn sáng",
     "bật đèn",
     "mở đèn",
 )
 LIGHT_OFF_PHRASES = (
     "tắt cái đèn",
+    "tắt điện",
+    "tắt cái điện",
     "đóng cái đèn",
     "cho đèn tắt",
     "tắt đèn",

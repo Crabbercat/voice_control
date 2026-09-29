@@ -1,7 +1,7 @@
-import lgpio
+import lgpio # type: ignore
 import time
 
-LED_PIN = 16
+LED_PIN = 18
 
 MOTOR_IN1 = 14
 MOTOR_IN2 = 15
