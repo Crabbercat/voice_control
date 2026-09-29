@@ -5,145 +5,78 @@ import unicodedata
 
 
 # ============================================================
-# COMMAND PHRASES
+# COMMANDS
 # ============================================================
 
-LIGHT_ON_PHRASES = (
-    "bật cái đèn",
-    "mở cái đèn",
-    "bật điện",
-    "mở điện",
-    "cho đèn sáng",
-    "bật đèn",
-    "mở đèn",
-)
+COMMANDS = {
+    "LIGHT_ON": (
+        "bật đèn",
+        "mở đèn",
+        "bật cái đèn",
+        "mở cái đèn",
+        "bật điện",
+        "mở điện",
+        "cho đèn sáng",
+    ),
 
-LIGHT_OFF_PHRASES = (
-    "tắt cái đèn",
-    "tắt điện",
-    "tắt cái điện",
-    "đóng cái đèn",
-    "cho đèn tắt",
-    "tắt đèn",
-    "đóng đèn",
-)
+    "LIGHT_OFF": (
+        "tắt đèn",
+        "đóng đèn",
+        "tắt cái đèn",
+        "đóng cái đèn",
+        "tắt điện",
+        "cho đèn tắt",
+    ),
 
-FAN_ON_PHRASES = (
-    "bật cái quạt",
-    "mở cái quạt",
-    "cho quạt chạy",
-    "bật quạt",
-    "mở quạt",
-)
+    "FAN_ON": (
+        "bật quạt",
+        "mở quạt",
+        "bật cái quạt",
+        "mở cái quạt",
+        "cho quạt chạy",
+    ),
 
-FAN_OFF_PHRASES = (
-    "tắt cái quạt",
-    "đóng cái quạt",
-    "dừng quạt",
-    "tắt quạt",
-    "đóng quạt",
-)
-
-COMMAND_PHRASES = (
-    ("LIGHT_ON", LIGHT_ON_PHRASES),
-    ("LIGHT_OFF", LIGHT_OFF_PHRASES),
-    ("FAN_ON", FAN_ON_PHRASES),
-    ("FAN_OFF", FAN_OFF_PHRASES),
-)
+    "FAN_OFF": (
+        "tắt quạt",
+        "đóng quạt",
+        "tắt cái quạt",
+        "đóng cái quạt",
+        "dừng quạt",
+        "cho quạt dừng",
+    ),
+}
 
 
-# ============================================================
-# NORMALIZATION
-# ============================================================
+def normalize(text: str) -> str:
+    """Chuẩn hóa text để dễ nhận diện dù ASR sai dấu."""
 
-def normalize_text(text: str) -> str:
-    """
-    Normalize Vietnamese ASR text.
+    text = text.lower()
 
-    - lowercase
-    - remove Vietnamese diacritics
-    - normalize đ -> d
-    - normalize whitespace
-    - remove punctuation
-    """
-
-    text = text.lower().strip()
-
-    # Một số ASR có thể trả về dấu câu
-    text = re.sub(r"[^\w\s]", " ", text, flags=re.UNICODE)
+    # Bỏ dấu câu
+    text = re.sub(r"[^\w\s]", " ", text)
 
     # đ -> d
     text = text.replace("đ", "d")
 
-    # Remove accents
+    # Bỏ dấu tiếng Việt
     text = "".join(
-        character
-        for character in unicodedata.normalize("NFD", text)
-        if unicodedata.category(character) != "Mn"
+        c
+        for c in unicodedata.normalize("NFD", text)
+        if unicodedata.category(c) != "Mn"
     )
 
-    # Normalize whitespace
-    text = re.sub(r"\s+", " ", text).strip()
+    # Chuẩn hóa khoảng trắng
+    return re.sub(r"\s+", " ", text).strip()
 
-    return text
-
-
-# ============================================================
-# ASR CORRECTION
-# ============================================================
-
-def correct_asr_text(text: str) -> str:
-    """
-    Correct only known ASR mistakes.
-
-    IMPORTANT:
-    Do not globally replace characters because that can
-    completely change unrelated words.
-    """
-
-    replacements = {
-        # cái -> cai
-        "tái đèn": "cái đèn",
-        "tái điện": "cái điện",
-        "tái quạt": "cái quạt",
-
-        # Một số trường hợp ASR có thể dính từ
-        "batden": "bat den",
-        "mo den": "mo den",
-        "tat den": "tat den",
-        "bat quat": "bat quat",
-        "mo quat": "mo quat",
-        "tat quat": "tat quat",
-    }
-
-    for wrong, correct in replacements.items():
-        text = text.replace(wrong, correct)
-
-    return text
-
-
-# ============================================================
-# COMMAND CLASSIFIER
-# ============================================================
 
 def classify_command(text: str) -> str:
-    """
-    Return:
-        LIGHT_ON
-        LIGHT_OFF
-        FAN_ON
-        FAN_OFF
-        UNKNOWN
-    """
+    """Nhận diện lệnh từ câu nói."""
 
-    normalized_text = normalize_text(text)
-    normalized_text = correct_asr_text(normalized_text)
+    text = normalize(text)
 
-    for command, phrases in COMMAND_PHRASES:
+    for command, phrases in COMMANDS.items():
         for phrase in phrases:
-            normalized_phrase = normalize_text(phrase)
-
-            if normalized_phrase in normalized_text:
+            if normalize(phrase) in text:
                 return command
 
     return "UNKNOWN"
@@ -155,27 +88,26 @@ def classify_command(text: str) -> str:
 
 if __name__ == "__main__":
 
-    examples = (
-        "BẬT   ĐÈN",
-        "mở cái quạt trong phòng",
-        "cho đèn tắt",
-        "dừng quạt",
+    tests = (
+        "BẬT ĐÈN",
+        "bat den",
+        "bật cái đèn",
+        "mo den",
+        "cho den sang",
+
+        "TẮT ĐÈN",
+        "tat dien",
+
+        "BẬT QUẠT",
+        "mo quat",
+        "cho quat chay",
+
+        "TẮT QUẠT",
+        "dung quat",
+
         "chúc mừng sinh nhật",
-
-        # ASR mistakes
-        "bật tái đèn",
-        "mở tái quạt",
-
-        # punctuation
-        "Bật đèn!",
-        "Tắt quạt.",
-
-        # unrelated
-        "bật máy lạnh",
         "mở cửa",
     )
 
-    for example in examples:
-        print(
-            f"{example!r:30} -> {classify_command(example)}"
-        )
+    for text in tests:
+        print(f"{text:25} -> {classify_command(text)}")
