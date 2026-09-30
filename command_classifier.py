@@ -9,7 +9,7 @@ from difflib import SequenceMatcher
 # COMMANDS
 # ============================================================
 
-SIMILARITY_THRESHOLD = 0.9
+SIMILARITY_THRESHOLD = 0.8
 
 COMMANDS = {
     "ALL_ON": (
