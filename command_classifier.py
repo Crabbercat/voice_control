@@ -31,6 +31,8 @@ COMMANDS = {
     ),
 
     "LIGHT_ON": (
+        "ánh sáng",
+        "tối quá",
         "bật đèn",
         "mở đèn",
         "bật cái đèn",
@@ -41,6 +43,8 @@ COMMANDS = {
     ),
 
     "LIGHT_OFF": (
+        "sáng quá",
+        "hạ màn",
         "tắt đèn",
         "đóng đèn",
         "tắt cái đèn",
@@ -51,6 +55,10 @@ COMMANDS = {
 
     "FAN_ON": (
         "bật quạt",
+        "bật cái quạt",
+        "nóng quá",
+        "thật nóng",
+        "nóng",
         "mở quạt",
         "bật cái quạt",
         "mở cái quạt",
@@ -59,6 +67,9 @@ COMMANDS = {
 
     "FAN_OFF": (
         "tắt quạt",
+        "lạnh quá",
+        "thật lạnh",
+        "lạnh",
         "đóng quạt",
         "tắt cái quạt",
         "đóng cái quạt",
