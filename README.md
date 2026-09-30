@@ -11,13 +11,14 @@ Microphone
     -> Wav2Vec2 Vietnamese ASR
     -> Vietnamese text
     -> Command classifier
-    -> LIGHT_ON / LIGHT_OFF / FAN_ON / FAN_OFF / UNKNOWN
+    -> ALL_ON / ALL_OFF / LIGHT_ON / LIGHT_OFF / FAN_ON / FAN_OFF / UNKNOWN
 ```
 
 Dự án hiện hỗ trợ hai thiết bị:
 
 - Đèn: `LIGHT_ON`, `LIGHT_OFF`
 - Quạt: `FAN_ON`, `FAN_OFF`
+- Tất cả thiết bị: `ALL_ON`, `ALL_OFF`
 
 Ứng dụng có thể chạy trên Raspberry Pi với GPIO thông qua `lgpio`. Khi chạy trên máy không có GPIO, hệ thống tự chuyển sang simulation mode để vẫn có thể kiểm thử giao diện và nhận dạng giọng nói. Chưa triển khai tài khoản người dùng, cơ sở dữ liệu hay chức năng điều khiển khác.
 

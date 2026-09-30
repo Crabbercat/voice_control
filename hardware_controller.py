@@ -65,6 +65,8 @@ class HardwareController:
 
     def execute(self, command: str) -> dict[str, object]:
         actions = {
+            "ALL_ON": self.all_on,
+            "ALL_OFF": self.all_off,
             "LIGHT_ON": self.light_on,
             "LIGHT_OFF": self.light_off,
             "FAN_ON": self.fan_on,
@@ -78,9 +80,29 @@ class HardwareController:
         return {
             "executed": True,
             "mode": self.mode,
-            "device": "light" if command.startswith("LIGHT") else "fan",
+            "device": (
+                "all"
+                if command.startswith("ALL")
+                else "light" if command.startswith("LIGHT") else "fan"
+            ),
             "state": "on" if command.endswith("ON") else "off",
         }
+
+    def all_on(self) -> None:
+        with self._lock:
+            self._write(LED_PIN, 1)
+            self._write(MOTOR_IN1, 1)
+            self._write(MOTOR_IN2, 0)
+            self._states["light"] = True
+            self._states["fan"] = True
+
+    def all_off(self) -> None:
+        with self._lock:
+            self._write(LED_PIN, 0)
+            self._write(MOTOR_IN1, 0)
+            self._write(MOTOR_IN2, 0)
+            self._states["light"] = False
+            self._states["fan"] = False
 
     def light_on(self) -> None:
         with self._lock:

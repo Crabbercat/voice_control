@@ -2,13 +2,34 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from difflib import SequenceMatcher
 
 
 # ============================================================
 # COMMANDS
 # ============================================================
 
+SIMILARITY_THRESHOLD = 0.9
+
 COMMANDS = {
+    "ALL_ON": (
+        "bật hết",
+        "mở hết",
+        "bật tất cả",
+        "mở tất cả",
+        "bật toàn bộ",
+        "mở toàn bộ",
+    ),
+
+    "ALL_OFF": (
+        "tắt hết",
+        "đóng hết",
+        "tắt tất cả",
+        "dừng tất cả",
+        "tắt toàn bộ",
+        "dừng toàn bộ",
+    ),
+
     "LIGHT_ON": (
         "bật đèn",
         "mở đèn",
@@ -76,10 +97,37 @@ def classify_command(text: str) -> str:
 
     for command, phrases in COMMANDS.items():
         for phrase in phrases:
-            if normalize(phrase) in text:
+            normalized_phrase = normalize(phrase)
+            if normalized_phrase in text:
                 return command
 
-    return "UNKNOWN"
+    best_command = "UNKNOWN"
+    best_similarity = 0.0
+
+    for command, phrases in COMMANDS.items():
+        for phrase in phrases:
+            normalized_phrase = normalize(phrase)
+            phrase_words = normalized_phrase.split()
+            text_words = text.split()
+            window_sizes = range(
+                max(1, len(phrase_words) - 1),
+                min(len(text_words), len(phrase_words) + 1) + 1,
+            )
+            for window_size in window_sizes:
+                for start in range(len(text_words) - window_size + 1):
+                    candidate = " ".join(
+                        text_words[start:start + window_size]
+                    )
+                    similarity = SequenceMatcher(
+                        None,
+                        normalized_phrase,
+                        candidate,
+                    ).ratio()
+                    if similarity >= SIMILARITY_THRESHOLD and similarity > best_similarity:
+                        best_command = command
+                        best_similarity = similarity
+
+    return best_command
 
 
 # ============================================================
@@ -94,6 +142,9 @@ if __name__ == "__main__":
         "bật cái đèn",
         "mo den",
         "cho den sang",
+
+        "bật hết",
+        "tat tat ca",
 
         "TẮT ĐÈN",
         "tat dien",
