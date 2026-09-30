@@ -341,6 +341,19 @@ def health():
 
 
 # ============================================================
+# HARDWARE STATUS
+# ============================================================
+
+@app.get("/status")
+def status():
+
+    return jsonify(
+        success=True,
+        hardware=hardware_controller.status(),
+    )
+
+
+# ============================================================
 # RECOGNIZE AUDIO
 # ============================================================
 
@@ -456,6 +469,10 @@ def recognize():
             hardware_controller.execute(
                 command
             )
+        )
+
+        hardware_result.update(
+            hardware_controller.status()
         )
 
         print(
