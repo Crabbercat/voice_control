@@ -26,7 +26,7 @@ class HardwareController:
 
         if not self._simulated:
             try:
-                import lgpio
+                import lgpio # type: ignore
 
                 self._lgpio = lgpio
                 self._handle = lgpio.gpiochip_open(0)
